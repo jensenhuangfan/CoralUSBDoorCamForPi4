@@ -21,7 +21,6 @@ def main():
     cam_choice = input("Are you using a Pi Camera Module 3 (libcamera) or a standard USB Webcam? (pi/usb) [default: pi]: ").strip().lower()
     camera_type = "usbcam" if cam_choice == "usb" else "picam3"
 
-    # Labels and behaviors
     unknown_label = input("\nLabel for unrecognized faces [default: Intruder]: ") or "Intruder"
     
     print("\n[Whitelists & Blacklists]")
@@ -46,7 +45,6 @@ def main():
     with open("config.json", "w") as f:
         json.dump(config, f, indent=4)
         
-    # Lock config strictly
     Path("config.json").chmod(0o600)
     print("Configuration saved securely!")
 

@@ -11,8 +11,14 @@ if [ ! -f "config.json" ]; then
     bash setup.sh
 fi
 
-echo "[Run] Activating virtual environment..."
-source .venv/bin/activate || true
+if [ -f ".env" ]; then
+    source .env
+fi
+
+if [ "$USE_VENV" != "false" ]; then
+    echo "[Run] Activating virtual environment..."
+    source .venv/bin/activate || echo "No .venv found, continuing without it..."
+fi
 
 echo "[Lockdown] Shutting down Raspberry Pi desktop panels so nothing else can run..."
 pkill -f lxpanel || true
