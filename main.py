@@ -61,15 +61,15 @@ class SpeechEngine:
             self.last_intruder_alert_time = now
             self.speak(CONFIG.get("unknown_label", "Intruder") + " alert.")
 
-    def process_person(self, name: str) -> None:
+    def process_person(self, name: str, list_type: str) -> None:
         now = time.time()
         last_time = self.last_welcome_time.get(name, 0.0)
         if now - last_time >= self.welcome_cooldown:
             self.last_welcome_time[name] = now
             
-            if name in CONFIG.get("whitelist", []):
+            if list_type == "whitelist":
                 self.speak(CONFIG["whitelist_greeting"].replace("{name}", name))
-            elif name in CONFIG.get("blacklist", []):
+            elif list_type == "blacklist":
                 self.speak(CONFIG["blacklist_greeting"].replace("{name}", name))
             else:
                 self.speak(CONFIG["default_known_greeting"].replace("{name}", name))
@@ -144,36 +144,44 @@ class FaceDatabase:
         self.recognizer = cv2.face.LBPHFaceRecognizer_create()
         self.unknown_threshold = unknown_threshold
         self.label_to_name: Dict[int, str] = {}
+        self.label_to_type: Dict[int, str] = {}
         self.is_trained = False
 
-    def train(self, known_faces_dir: Path, detector: CoralFaceDetector) -> None:
-        if not known_faces_dir.exists(): return
-        
+    def train(self, directories: List[Path], detector: CoralFaceDetector) -> None:
         samples, labels = [], []
-        person_dirs = sorted([p for p in known_faces_dir.iterdir() if p.is_dir()])
-        for label, person_dir in enumerate(person_dirs):
-            self.label_to_name[label] = person_dir.name
-            for image_path in person_dir.rglob("*"):
-                if image_path.is_file() and image_path.suffix.lower() in IMAGE_SUFFIXES:
-                    img = cv2.imread(str(image_path))
-                    if img is None: continue
-                    detection = detector.detect_largest_face(img)
-                    if detection:
-                        processed = preprocess_face(img, detection.bbox)
-                        if processed is not None:
-                            samples.append(processed)
-                            labels.append(label)
+        current_label = 0
+        
+        for directory in directories:
+            if not directory.exists(): continue
+            list_type = directory.name # 'whitelist' or 'blacklist'
+            
+            for person_dir in sorted([p for p in directory.iterdir() if p.is_dir()]):
+                self.label_to_name[current_label] = person_dir.name
+                self.label_to_type[current_label] = list_type
+                
+                for image_path in person_dir.rglob("*"):
+                    if image_path.is_file() and image_path.suffix.lower() in IMAGE_SUFFIXES:
+                        img = cv2.imread(str(image_path))
+                        if img is None: continue
+                        detection = detector.detect_largest_face(img)
+                        if detection:
+                            processed = preprocess_face(img, detection.bbox)
+                            if processed is not None:
+                                samples.append(processed)
+                                labels.append(current_label)
+                current_label += 1
+                
         if len(samples) > 1:
             self.recognizer.train(samples, np.array(labels, dtype=np.int32))
             self.is_trained = True
 
-    def predict(self, face_crop: np.ndarray) -> Tuple[str, float]:
+    def predict(self, face_crop: np.ndarray) -> Tuple[str, float, str]:
         if not self.is_trained:
-            return CONFIG.get("unknown_label", "Intruder"), 999.0
+            return CONFIG.get("unknown_label", "Intruder"), 999.0, "unknown"
         label, confidence = self.recognizer.predict(face_crop)
         if confidence <= self.unknown_threshold and label in self.label_to_name:
-            return self.label_to_name[label], float(confidence)
-        return CONFIG.get("unknown_label", "Intruder"), float(confidence)
+            return self.label_to_name[label], float(confidence), self.label_to_type[label]
+        return CONFIG.get("unknown_label", "Intruder"), float(confidence), "unknown"
 
 def draw_result(frame: np.ndarray, bbox: Tuple[int, int, int, int], name: str, score: float, conf: float) -> None:
     x1, y1, x2, y2 = bbox
@@ -191,7 +199,12 @@ def main() -> int:
 
     detector = CoralFaceDetector(Path("models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"))
     face_db = FaceDatabase()
-    face_db.train(Path("known_faces"), detector)
+    
+    train_dirs = [Path("whitelist")]
+    if CONFIG.get("has_blacklist"):
+        train_dirs.append(Path("blacklist"))
+    face_db.train(train_dirs, detector)
+    
     speech = SpeechEngine(intruder_cooldown=3.0, welcome_cooldown=8.0)
 
     use_usbcam = args.usbcam or (CONFIG.get("camera_type") == "usbcam")
@@ -225,26 +238,28 @@ def main() -> int:
                 cached_detections = detector.detect_faces(frame)
 
             known_faces_this_frame = set()
+            known_faces_types = {}
             has_unknown = False
 
             for detection in cached_detections:
                 processed = preprocess_face(frame, detection.bbox)
                 if processed is None: continue
 
-                name, confidence = face_db.predict(processed)
+                name, confidence, list_type = face_db.predict(processed)
                 draw_result(frame, detection.bbox, name, detection.score, confidence)
 
                 if name == CONFIG.get("unknown_label", "Intruder"):
                     has_unknown = True
                 else:
                     known_faces_this_frame.add(name)
+                    known_faces_types[name] = list_type
 
             if has_unknown:
                 speech.alert_intruder()
             
             for name in known_faces_this_frame:
                 if name not in last_known_faces:
-                    speech.process_person(name)
+                    speech.process_person(name, known_faces_types[name])
 
             last_known_faces = known_faces_this_frame
 

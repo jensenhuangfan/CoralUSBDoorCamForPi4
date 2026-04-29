@@ -7,9 +7,13 @@ echo "This is a strict requirement for Google Coral's Python packages."
 echo "============================================="
 
 # 1. Update and install dependencies
-echo "[1/6] Installing APT dependencies..."
+echo "[1/6] Installing APT dependencies and Google Coral drivers..."
+# Add Google Coral repository
+echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
 sudo apt-get update
-sudo apt-get install -y espeak libespeak1 espeak-ng python3-opencv python3-pip
+sudo apt-get install -y espeak libespeak1 espeak-ng python3-opencv python3-pip libedgetpu1-std python3-pycoral
 
 # 2. Virtual Environment setup
 echo "[2/6] Python Environment Setup..."
@@ -31,10 +35,7 @@ if [ ! -f "models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite" ]; the
     wget -O models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite     https://github.com/google-coral/test_data/raw/master/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite
 fi
 
-# 4. Folder creation & OS lock
-echo "[4/6] Creating secure directories..."
-mkdir -p known_faces
-
+# 4. OS lock
 # 5. Disable sleep and auto-display off
 read -p "Do you want to disable screen sleep and auto-display off? (y/n): " disable_sleep
 if [[ "$disable_sleep" == "y" || "$disable_sleep" == "Y" ]]; then
@@ -82,7 +83,8 @@ chown -R $USER:$USER "$APP_DIR"
 
 echo "============================================="
 echo " Setup Complete! "
-echo " Add your photos to known_faces/<Name>/"
+echo " Add your photos to whitelist/<Name>/ or blacklist/<Name>/"
 echo " To run: ./run.sh"
+echo " To configure later: python3 admin_tool.py"
 echo " See DOCUMENTATION.md for details."
 echo "============================================="
