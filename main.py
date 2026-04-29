@@ -6,6 +6,7 @@ import argparse
 import os
 import json
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Set
@@ -35,6 +36,48 @@ def get_display_resolution() -> Tuple[int, int]:
         return w, h
     except Exception:
         return 1920, 1080
+
+class VolumeManager:
+    def __init__(self):
+        self.saved_volume = 50
+        self.is_cranked = False
+        self._get_initial_volume()
+
+    def _get_initial_volume(self):
+        try:
+            out = subprocess.check_output("amixer sget Master", shell=True, stderr=subprocess.DEVNULL).decode()
+            if "[off]" in out:
+                self.saved_volume = 50
+                self.set_volume(50)
+            else:
+                match = re.search(r"\[(\d+)%\]", out)
+                if match:
+                    vol = int(match.group(1))
+                    if vol <= 5:  # Consider muted or practically 0
+                        self.saved_volume = 50
+                        self.set_volume(50)
+                    else:
+                        self.saved_volume = vol
+                else:
+                    self.saved_volume = 50
+        except Exception:
+            self.saved_volume = 50
+
+    def set_volume(self, pct: int):
+        try:
+            subprocess.run(f"amixer sset Master unmute {pct}%", shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def crank(self):
+        if not self.is_cranked:
+            self.set_volume(100)
+            self.is_cranked = True
+
+    def restore(self):
+        if self.is_cranked:
+            self.set_volume(self.saved_volume)
+            self.is_cranked = False
 
 class SpeechEngine:
     def __init__(self, intruder_cooldown: float = 3.0, welcome_cooldown: float = 8.0) -> None:
@@ -223,6 +266,7 @@ def main() -> int:
 
     key_buffer = ""
     alarm_mode = False
+    vol_mgr = VolumeManager()
     
     frame_idx = 0
     cached_detections = []
@@ -263,9 +307,15 @@ def main() -> int:
 
             last_known_faces = known_faces_this_frame
 
+            has_blacklist = any(known_faces_types.get(name) == "blacklist" for name in known_faces_this_frame)
+            
+            if alarm_mode or has_blacklist:
+                vol_mgr.crank()
+            else:
+                vol_mgr.restore()
+
             if alarm_mode:
                 if has_unknown or len(cached_detections) > 0:
-                    os.system("amixer sset Master 100% 2>/dev/null")
                     speech.speak("Alert Alert")
                 else:
                     alarm_mode = False
@@ -287,6 +337,7 @@ def main() -> int:
                     key_buffer += chr(key)
 
     finally:
+        vol_mgr.restore()
         cap.release()
         cv2.destroyAllWindows()
     return 0
