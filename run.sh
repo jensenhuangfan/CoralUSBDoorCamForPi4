@@ -1,45 +1,28 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# Auto Update
+echo "[Run] Checking for GitHub updates..."
+git pull origin main || echo "Update check failed or not a repo. Continuing..."
 
-# This script activates the .venv and runs the Coral face gate app
-
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="${ROOT_DIR}/.venv"
-MODEL_DIR="${ROOT_DIR}/models"
-MODEL_FILE="${MODEL_DIR}/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"
-
-# Activate virtual environment
-if [[ -d "${VENV_DIR}" ]]; then
-    echo "[Init] Activating virtual environment..."
-    source "${VENV_DIR}/bin/activate"
-else
-    echo "[Error] Virtual environment not found at ${VENV_DIR}"
-    echo "Create one with: python3 -m venv .venv"
-    exit 1
-fi
-
-# Download model if missing
-if [[ ! -f "${MODEL_FILE}" ]]; then
-    echo "[Init] Downloading Edge TPU model..."
-    bash "${ROOT_DIR}/scripts/download_models.sh" || {
-        echo "[Error] Failed to download model"
-        exit 1
-    }
-fi
-
-# Run the app
-echo "[Run] Starting Coral Face Gate (fullscreen mode)"
-echo "Press Q to quit"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 cd "${ROOT_DIR}"
 
-# Ensure no zombie python processes are hogging the Coral USB
-echo "[Init] Releasing any hung Coral USB connections..."
-pkill -f "python3 main.py" || true
-
-# Determine if we should attempt picam3 mode if no camera specified
-if [[ "$*" == *"--picam3"* ]]; then
-    python3 main.py "$@"
-else
-    echo "Tip: using a Pi Camera 3? Add --picam3 flag."
-    python3 main.py "$@"
+if [ ! -f "config.json" ]; then
+    echo "Config not found! Running setup..."
+    bash setup.sh
 fi
+
+echo "[Run] Activating virtual environment..."
+source .venv/bin/activate || true
+
+echo "[Lockdown] Shutting down Raspberry Pi desktop panels so nothing else can run..."
+pkill -f lxpanel || true
+pkill -f pcmanfm || true
+pkill -f wf-panel-pi || true
+
+echo "[Run] Starting Face Gate UI..."
+python3 main.py "$@"
+
+echo "[Unlocked] Restoring desktop interface..."
+nohup lxpanel --profile LXDE-pi >/dev/null 2>&1 &
+nohup pcmanfm --desktop --profile LXDE-pi >/dev/null 2>&1 &
+nohup wf-panel-pi >/dev/null 2>&1 &

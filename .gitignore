@@ -1,0 +1,8 @@
+# Ignore known_faces to prevent personal data leaking
+known_faces/
+models/
+config.json
+.venv/
+__pycache__/
+*.pyc
+*.tflite
