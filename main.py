@@ -387,8 +387,16 @@ def main() -> int:
                     if hashlib.sha256(key_buffer.encode()).hexdigest() == CONFIG.get("password_hash"):
                         log_event("SUCCESS: Correct password entered to unlock system.")
                         if tamper_mode:
-                            log_event("Tamper mode recovering...")
-                            exit_code = 42
+                            # Verify if the hardware is actually plugged back in before restarting!
+                            lsusb_out = subprocess.getoutput("lsusb")
+                            coral_present = "1a6e:089a" in lsusb_out or "18d1:9302" in lsusb_out or "Google" in lsusb_out or "Global Unichip" in lsusb_out
+                            
+                            if coral_present:
+                                log_event("Tamper mode recovering: Coral detected, restarting app.")
+                                exit_code = 42
+                            else:
+                                log_event("Tamper override: Coral still missing, unlocking to desktop.")
+                                exit_code = 0
                         break
                     else:
                         log_event(f"SECURITY: Failed password attempt logged. Length={len(key_buffer)}")
