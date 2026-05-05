@@ -43,13 +43,14 @@ def main():
         print("2. Change Unknown Face Label")
         print("3. Toggle Blacklist Folder Feature")
         print("4. Edit System Greetings")
-        print("5. Change Admin Password")
-        print("6. Check for App Updates (GitHub Sync)")
-        print("7. Re-run Initial Setup Wizard")
-        print("8. Uninstall Application")
-        print("9. Exit Admin Tool")
+        print("5. Advanced AI & Audio Tuning")
+        print("6. Change Admin Password")
+        print("7. Check for App Updates (GitHub Sync)")
+        print("8. Re-run Initial Setup Wizard")
+        print("9. Uninstall Application")
+        print("10. Exit Admin Tool")
         
-        choice = input("Select an option (1-9): ").strip()
+        choice = input("Select an option (1-10): ").strip()
         
         if choice == "1":
             print("\n[Change Camera Type]")
@@ -115,6 +116,42 @@ def main():
                     save_config(config)
 
         elif choice == "5":
+            print("\n[Advanced AI & Audio Tuning]")
+            print(f"1. Face Detection Threshold (Current: {config.get('detection_threshold', 0.45)})")
+            print(f"2. Recognition Strictness/LBPH Distance (Current: {config.get('unknown_threshold', 115.0)})")
+            print(f"3. Intruder Alarm Cooldown in seconds (Current: {config.get('intruder_cooldown', 3.0)})")
+            print(f"4. Welcome Greeting Cooldown in seconds (Current: {config.get('welcome_cooldown', 8.0)})")
+            print(f"5. AI Speech Rate in WPM (Current: {config.get('speech_speed', 150)})")
+            print("6. Back to Main Menu")
+            tune_choice = input("Select which to edit (1-6): ").strip()
+            
+            if tune_choice == "1":
+                try: 
+                    config["detection_threshold"] = float(input("New value (e.g. 0.45): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif tune_choice == "2":
+                try:
+                    config["unknown_threshold"] = float(input("New value (lower=stricter, e.g. 110.0): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif tune_choice == "3":
+                try:
+                    config["intruder_cooldown"] = float(input("New cooldown in seconds: "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif tune_choice == "4":
+                try:
+                    config["welcome_cooldown"] = float(input("New cooldown in seconds: "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif tune_choice == "5":
+                try:
+                    config["speech_speed"] = int(input("New speed (e.g. 150): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+
+        elif choice == "6":
             print("\n[Change Password]")
             new_pwd = getpass.getpass("Enter new password: ")
             new_pwd2 = getpass.getpass("Confirm new password: ")
@@ -124,20 +161,20 @@ def main():
             else:
                 print("Passwords do not match or are empty. Aborted.")
 
-        elif choice == "6":
+        elif choice == "7":
             print("\n[Checking for GitHub update...]")
             log_event("Initiated manual git update check.")
             subprocess.run(["git", "pull", "origin", "main"])
             print("Update task finished.")
 
-        elif choice == "7":
+        elif choice == "8":
             print("\n[Re-run Setup Wizard]")
             log_event("Launched setup_app.py manually.")
             subprocess.run(["python3", "setup_app.py"])
             with open("config.json", "r") as f:
                 config = json.load(f)
 
-        elif choice == "8":
+        elif choice == "9":
             print("\n[Uninstall Application]")
             print("1. YES, proceed with full uninstall.")
             print("2. Cancel uninstall.")
@@ -152,7 +189,7 @@ def main():
             else:
                 print("Uninstall cancelled.")
 
-        elif choice == "9":
+        elif choice == "10":
             print("Exiting tool.")
             break
         else:

@@ -48,7 +48,12 @@ def main():
         "has_blacklist": has_blacklist,
         "whitelist_greeting": "Welcome {name}",
         "blacklist_greeting": "Warning, {name} is restricted",
-        "default_known_greeting": "Hello {name}"
+        "default_known_greeting": "Hello {name}",
+        "detection_threshold": 0.45,
+        "unknown_threshold": 115.0,
+        "intruder_cooldown": 3.0,
+        "welcome_cooldown": 8.0,
+        "speech_speed": 150
     }
 
     with open("config.json", "w") as f:

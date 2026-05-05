@@ -91,7 +91,8 @@ class SpeechEngine:
         def _speak_bg() -> None:
             with self.lock:
                 try:
-                    subprocess.run(["espeak", "-s", "150", text], check=False)
+                    speed = str(CONFIG.get("speech_speed", 150))
+                    subprocess.run(["espeak", "-s", speed, text], check=False)
                 except Exception as e:
                     print(f"Audio Error: {e}")
 
@@ -240,15 +241,21 @@ def main() -> int:
     parser.add_argument("--usbcam", action="store_true")
     args, _ = parser.parse_known_args()
 
-    detector = CoralFaceDetector(Path("models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"))
-    face_db = FaceDatabase()
+    detector = CoralFaceDetector(
+        Path("models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"),
+        threshold=CONFIG.get("detection_threshold", 0.45)
+    )
+    face_db = FaceDatabase(unknown_threshold=CONFIG.get("unknown_threshold", 115.0))
     
     train_dirs = [Path("whitelist")]
     if CONFIG.get("has_blacklist"):
         train_dirs.append(Path("blacklist"))
     face_db.train(train_dirs, detector)
     
-    speech = SpeechEngine(intruder_cooldown=3.0, welcome_cooldown=8.0)
+    speech = SpeechEngine(
+        intruder_cooldown=CONFIG.get("intruder_cooldown", 3.0),
+        welcome_cooldown=CONFIG.get("welcome_cooldown", 8.0)
+    )
 
     use_usbcam = args.usbcam or (CONFIG.get("camera_type") == "usbcam")
     if use_usbcam:
