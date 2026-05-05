@@ -30,7 +30,19 @@ echo "[Cleanup] Freeing up Coral TPU from zombie processes..."
 pkill -f "python3 main.py" || true
 
 echo "[Run] Starting Face Gate UI..."
-python3 main.py "$@"
+while True; do
+    python3 main.py "$@"
+    EXIT_CODE=$?
+    
+    # If the user typed the correct password, main.py returns exit code 0
+    if [ $EXIT_CODE -eq 0 ]; then
+        break
+    fi
+    
+    # If the script crashed (e.g. C++ aborts from TPU unplug or Segfault), auto-restart it
+    echo "[Security] Critical application crash detected! Attempting immediate lock restart..."
+    sleep 1
+done
 
 echo "[Unlocked] Restoring desktop interface..."
 nohup lxpanel --profile LXDE-pi >/dev/null 2>&1 &
