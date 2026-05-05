@@ -30,7 +30,7 @@ echo "[Cleanup] Freeing up Coral TPU from zombie processes..."
 pkill -f "python3 main.py" || true
 
 echo "[Run] Starting Face Gate UI..."
-while True; do
+while true; do
     python3 main.py "$@"
     EXIT_CODE=$?
     
