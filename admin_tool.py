@@ -39,49 +39,59 @@ def main():
 
     while True:
         print("\n--- Admin Settings Menu ---")
-        print("1. Change Target Camera Type")
-        print("2. Change Unknown Face Label")
-        print("3. Toggle Blacklist Folder Feature")
-        print("4. Edit System Greetings")
-        print("5. Advanced AI & Audio Tuning")
-        print("6. Change Admin Password")
-        print("7. Check for App Updates (GitHub Sync)")
-        print("8. Re-run Initial Setup Wizard")
-        print("9. Uninstall Application")
-        print("10. Configure Event Logging")
-        print("11. Exit Admin Tool")
+        print("1. Camera & System Setup")
+        print("2. Display & Label Preferences")
+        print("3. Detection & Blacklist Tools")
+        print("4. Greeting Phrases")
+        print("5. Audio, Speech, & Volume Tuner")
+        print("6. AI Recognition Thresholds")
+        print("7. Event Logging & Diagnostics")
+        print("8. Change Admin Master Password")
+        print("9. Uninstall & Setup Management")
+        print("10. Exit Admin Tool")
         
-        choice = input("Select an option (1-11): ").strip()
+        choice = input("Select an option (1-10): ").strip()
         
         if choice == "1":
-            print("\n[Change Camera Type]")
-            print(f"Current: {config.get('camera_type')}")
+            print("\n[Camera & System Setup]")
+            print(f"Current Camera: {config.get('camera_type')}")
             print("1. Pi Camera Module 3 (libcamera)")
             print("2. Standard USB Webcam")
-            cam_choice = input("Select new camera type (1-2): ").strip()
+            print("3. Back to Main Menu")
+            cam_choice = input("Select an option (1-3): ").strip()
             if cam_choice == "1":
                 config["camera_type"] = "picam3"
                 save_config(config)
             elif cam_choice == "2":
                 config["camera_type"] = "usbcam"
                 save_config(config)
-            else:
-                print("Invalid choice, skipped.")
 
         elif choice == "2":
-            print(f"\nCurrent Unknown Face Label: {config.get('unknown_label')}")
-            new_lbl = input("Enter new label for unknown faces (leave blank to cancel): ").strip()
-            if new_lbl:
-                config["unknown_label"] = new_lbl
+            print("\n[Display & Label Preferences]")
+            print(f"1. Change Unknown Face Label (Current: {config.get('unknown_label')})")
+            print(f"2. Toggle Bounding Box Rendering (Current: {'ON' if config.get('draw_boxes', True) else 'OFF'})")
+            print(f"3. Draw Text Overlays on Faces (Current: {'ON' if config.get('draw_text', True) else 'OFF'})")
+            disp_choice = input("Select option (1-3): ").strip()
+            if disp_choice == "1":
+                new_lbl = input("Enter new label for unknown faces (leave blank to cancel): ").strip()
+                if new_lbl:
+                    config["unknown_label"] = new_lbl
+                    save_config(config)
+            elif disp_choice == "2":
+                config["draw_boxes"] = not config.get("draw_boxes", True)
+                save_config(config)
+            elif disp_choice == "3":
+                config["draw_text"] = not config.get("draw_text", True)
                 save_config(config)
 
         elif choice == "3":
-            current_status = config.get("has_blacklist", False)
-            status_text = "Enabled" if current_status else "Disabled"
-            print(f"\nCurrent Blacklist feature is: {status_text}")
+            print("\n[Detection & Blacklist Tools]")
+            status_text = "Enabled" if config.get("has_blacklist", False) else "Disabled"
+            print(f"Current Blacklist feature is: {status_text}")
             print("1. Enable Blacklist Feature")
             print("2. Disable Blacklist Feature")
-            bl_choice = input("Select (1-2): ").strip()
+            print("3. Back to Main Menu")
+            bl_choice = input("Select (1-3): ").strip()
             if bl_choice == "1":
                 config["has_blacklist"] = True
                 Path("blacklist").mkdir(parents=True, exist_ok=True)
@@ -93,7 +103,6 @@ def main():
         elif choice == "4":
             print("\n[Edit System Greetings]")
             print("Use {name} inside the text where you want the person's name spoken.")
-            
             print(f"1. Edit Whitelist Greeting (Current: {config.get('whitelist_greeting')})")
             print(f"2. Edit Blacklist Greeting (Current: {config.get('blacklist_greeting')})")
             print(f"3. Edit Default Known Greeting (Current: {config.get('default_known_greeting')})")
@@ -117,14 +126,51 @@ def main():
                     save_config(config)
 
         elif choice == "5":
-            print("\n[Advanced AI & Audio Tuning]")
+            print("\n[Audio, Speech, & Volume Tuner]")
+            print(f"1. AI Speech Rate in WPM (Current: {config.get('speech_speed', 150)})")
+            print(f"2. Disable/Enable Speech Engine (Current: {'ON' if config.get('enable_speech', True) else 'OFF'})")
+            print(f"3. eSpeak Voice Language/Type (Current: {config.get('espeak_voice', 'en-us')})")
+            print(f"4. Override System Volume Controls (Current: {'ON' if config.get('manage_volume', True) else 'OFF'})")
+            print(f"5. Maximum Alarm Volume Percent (Current: {config.get('max_volume_pct', 100)}%)")
+            print(f"6. Standard Idle Volume Percent (Current: {config.get('idle_volume_pct', 50)}%)")
+            print("7. Back to Main Menu")
+            aud_choice = input("Select which to edit (1-7): ").strip()
+            
+            if aud_choice == "1":
+                try:
+                    config["speech_speed"] = int(input("New speed WPM (e.g. 150): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif aud_choice == "2":
+                config["enable_speech"] = not config.get("enable_speech", True)
+                save_config(config)
+            elif aud_choice == "3":
+                nv = input("Enter new eSpeak voice code (e.g. en-us, en-gb, f1, m1): ").strip()
+                if nv:
+                    config["espeak_voice"] = nv
+                    save_config(config)
+            elif aud_choice == "4":
+                config["manage_volume"] = not config.get("manage_volume", True)
+                save_config(config)
+            elif aud_choice == "5":
+                try:
+                    config["max_volume_pct"] = int(input("New alarm volume percent (0-100): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+            elif aud_choice == "6":
+                try:
+                    config["idle_volume_pct"] = int(input("New idle system volume percent (0-100): "))
+                    save_config(config)
+                except ValueError: print("Invalid number.")
+
+        elif choice == "6":
+            print("\n[AI Recognition Thresholds]")
             print(f"1. Face Detection Threshold (Current: {config.get('detection_threshold', 0.45)})")
             print(f"2. Recognition Strictness/LBPH Distance (Current: {config.get('unknown_threshold', 115.0)})")
             print(f"3. Intruder Alarm Cooldown in seconds (Current: {config.get('intruder_cooldown', 3.0)})")
             print(f"4. Welcome Greeting Cooldown in seconds (Current: {config.get('welcome_cooldown', 8.0)})")
-            print(f"5. AI Speech Rate in WPM (Current: {config.get('speech_speed', 150)})")
-            print("6. Back to Main Menu")
-            tune_choice = input("Select which to edit (1-6): ").strip()
+            print("5. Back to Main Menu")
+            tune_choice = input("Select which to edit (1-5): ").strip()
             
             if tune_choice == "1":
                 try: 
@@ -146,52 +192,9 @@ def main():
                     config["welcome_cooldown"] = float(input("New cooldown in seconds: "))
                     save_config(config)
                 except ValueError: print("Invalid number.")
-            elif tune_choice == "5":
-                try:
-                    config["speech_speed"] = int(input("New speed (e.g. 150): "))
-                    save_config(config)
-                except ValueError: print("Invalid number.")
-
-        elif choice == "6":
-            print("\n[Change Password]")
-            new_pwd = getpass.getpass("Enter new password: ")
-            new_pwd2 = getpass.getpass("Confirm new password: ")
-            if new_pwd == new_pwd2 and len(new_pwd) > 0:
-                config["password_hash"] = hashlib.sha256(new_pwd.encode()).hexdigest()
-                save_config(config)
-            else:
-                print("Passwords do not match or are empty. Aborted.")
 
         elif choice == "7":
-            print("\n[Checking for GitHub update...]")
-            log_event("Initiated manual git update check.")
-            subprocess.run(["git", "pull", "origin", "main"])
-            print("Update task finished.")
-
-        elif choice == "8":
-            print("\n[Re-run Setup Wizard]")
-            log_event("Launched setup_app.py manually.")
-            subprocess.run(["python3", "setup_app.py"])
-            with open("config.json", "r") as f:
-                config = json.load(f)
-
-        elif choice == "9":
-            print("\n[Uninstall Application]")
-            print("1. YES, proceed with full uninstall.")
-            print("2. Cancel uninstall.")
-            confirm = input("Select an option (1-2): ").strip()
-            if confirm == "1":
-                log_event("Uninstalled application via Admin menu.")
-                print("Removing autostart entry...")
-                os.system("rm -f ~/.config/autostart/facegate.desktop")
-                print("Note: To fully delete files, you must delete this directory manually or run: rm -rf " + os.getcwd())
-                print("Uninstall hooks completed. Exiting Admin Tool.")
-                break
-            else:
-                print("Uninstall cancelled.")
-
-        elif choice == "10":
-            print("\n[Configure Event Logging]")
+            print("\n[Event Logging & Diagnostics]")
             log_enabled = config.get("enable_logging", True)
             print(f"1. Toggle Logging (Currently: {'ON' if log_enabled else 'OFF'})")
             print(f"2. Change Log Target File (Currently: {config.get('log_file', 'security_log.txt')})")
@@ -214,9 +217,45 @@ def main():
                     print("-------------------\n")
                 else:
                     print("Log file not found.")
-        
-        elif choice == "11":
-            print("Exiting tool.")
+
+        elif choice == "8":
+            print("\n[Change Admin Master Password]")
+            new_pwd = getpass.getpass("Enter new password: ")
+            new_pwd2 = getpass.getpass("Confirm new password: ")
+            if new_pwd == new_pwd2 and len(new_pwd) > 0:
+                config["password_hash"] = hashlib.sha256(new_pwd.encode()).hexdigest()
+                save_config(config)
+            else:
+                print("Passwords do not match or are empty. Aborted.")
+
+        elif choice == "9":
+            print("\n[Uninstall & Setup Management]")
+            print("1. Check for App Updates (GitHub Sync)")
+            print("2. Re-run Initial Setup Wizard")
+            print("3. Uninstall Application")
+            print("4. Back to Main Menu")
+            sys_ops = input("Select option (1-4): ").strip()
+
+            if sys_ops == "1":
+                log_event("Initiated manual git update check.")
+                subprocess.run(["git", "pull", "origin", "main"])
+                print("Update task finished.")
+            elif sys_ops == "2":
+                log_event("Launched setup_app.py manually.")
+                subprocess.run(["python3", "setup_app.py"])
+                with open("config.json", "r") as f:
+                    config = json.load(f)
+            elif sys_ops == "3":
+                print("WARNING: This will initiate system-level uninstalls.")
+                confirm = input("Type 'YES' to proceed with full uninstall: ").strip()
+                if confirm == "YES":
+                    log_event("Uninstalled application via Admin menu.")
+                    os.system("rm -f ~/.config/autostart/facegate.desktop")
+                    print("Uninstall hooks completed. Terminating program.")
+                    break
+
+        elif choice == "10":
+            print("Exiting Admin Tool.")
             break
         else:
             print("Invalid input.")
