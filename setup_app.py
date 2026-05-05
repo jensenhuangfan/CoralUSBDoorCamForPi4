@@ -18,8 +18,10 @@ def main():
         print("Passwords do not match or are empty. Try again.")
         
     print("\n[Camera Setup]")
-    cam_choice = input("Are you using a Pi Camera Module 3 (libcamera) or a standard USB Webcam? (pi/usb) [default: pi]: ").strip().lower()
-    camera_type = "usbcam" if cam_choice == "usb" else "picam3"
+    print("1. Pi Camera Module 3 (libcamera)")
+    print("2. Standard USB Webcam")
+    cam_choice = input("Select camera type (1-2) [default: 1]: ").strip()
+    camera_type = "usbcam" if cam_choice == "2" else "picam3"
 
     unknown_label = input("\nLabel for unrecognized faces [default: Intruder]: ") or "Intruder"
     
@@ -30,12 +32,14 @@ def main():
     
     Path("whitelist").mkdir(parents=True, exist_ok=True)
     
-    use_blacklist = input("Do you want a separate 'blacklist' folder to trap/restrict specific people? (y/n) [default: y]: ").strip().lower()
-    if use_blacklist != "n":
+    print("\nDo you want a separate 'blacklist' folder to trap/restrict specific people?")
+    print("1. Yes (default)")
+    print("2. No")
+    bl_choice = input("Select an option (1-2): ").strip()
+    
+    has_blacklist = (bl_choice != "2")
+    if has_blacklist:
         Path("blacklist").mkdir(parents=True, exist_ok=True)
-        has_blacklist = True
-    else:
-        has_blacklist = False
 
     config = {
         "password_hash": hash_password(pwd),
