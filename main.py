@@ -263,7 +263,7 @@ def main() -> int:
         cap = cv2.VideoCapture(args.camera, cv2.CAP_V4L2)
     else:
         print("[Init] Connecting to Raspberry Pi Camera 3 via libcamera...")
-        cap = cv2.VideoCapture("libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink", cv2.CAP_GSTREAMER)
+        cap = cv2.VideoCapture("libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink max-buffers=1 drop=true sync=false", cv2.CAP_GSTREAMER)
 
     cv2.namedWindow("Coral Face Gate", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
     cv2.setWindowProperty("Coral Face Gate", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
