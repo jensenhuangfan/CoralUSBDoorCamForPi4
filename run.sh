@@ -34,9 +34,16 @@ while true; do
     python3 main.py "$@"
     EXIT_CODE=$?
     
-    # If the user typed the correct password, main.py returns exit code 0
+    # If the user typed the correct password during normal operation, main.py returns exit code 0
     if [ $EXIT_CODE -eq 0 ]; then
         break
+    fi
+
+    # If the user typed the password during tamper mode to reconnect devices, it returns 42
+    if [ $EXIT_CODE -eq 42 ]; then
+        echo "[Security] Admin authorized reconnect. Reloading application..."
+        sleep 1
+        continue
     fi
     
     # If the script crashed (e.g. C++ aborts from TPU unplug or Segfault), auto-restart it

@@ -292,6 +292,7 @@ def main() -> int:
     frame_idx = 0
     cached_detections = []
     last_known_faces = set()
+    exit_code = 0
 
     try:
         while True:
@@ -369,6 +370,8 @@ def main() -> int:
             if key != 255:
                 if key in [10, 13]: 
                     if hashlib.sha256(key_buffer.encode()).hexdigest() == CONFIG.get("password_hash"):
+                        if tamper_mode:
+                            exit_code = 42
                         break
                     else:
                         alarm_mode = True
@@ -383,7 +386,7 @@ def main() -> int:
         if cap is not None:
             cap.release()
         cv2.destroyAllWindows()
-    return 0
+    return exit_code
 
 if __name__ == "__main__":
     main()
