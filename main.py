@@ -273,6 +273,8 @@ def main() -> int:
 
     key_buffer = ""
     alarm_mode = False
+    tamper_mode = False
+    last_tamper_alarm = 0.0
     vol_mgr = VolumeManager()
     
     frame_idx = 0
@@ -281,53 +283,74 @@ def main() -> int:
 
     try:
         while True:
-            ok, frame = cap.read()
-            if not ok: break
+            if not tamper_mode:
+                ok, frame = cap.read()
+                if not ok: 
+                    print("[Security] Camera unplugged or frame read failed! Entering TAMPER MODE.")
+                    tamper_mode = True
+                    continue
 
-            frame_idx += 1
-            if frame_idx % 2 == 0:
-                cached_detections = detector.detect_faces(frame)
+                frame_idx += 1
+                try:
+                    if frame_idx % 2 == 0:
+                        cached_detections = detector.detect_faces(frame)
+                except Exception as e:
+                    print(f"[Security] HW Exception (Coral TPU unplugged?): {e}")
+                    tamper_mode = True
+                    continue
 
-            known_faces_this_frame = set()
-            known_faces_types = {}
-            has_unknown = False
+                known_faces_this_frame = set()
+                known_faces_types = {}
+                has_unknown = False
 
-            for detection in cached_detections:
-                processed = preprocess_face(frame, detection.bbox)
-                if processed is None: continue
+                for detection in cached_detections:
+                    processed = preprocess_face(frame, detection.bbox)
+                    if processed is None: continue
 
-                name, confidence, list_type = face_db.predict(processed)
-                draw_result(frame, detection.bbox, name, detection.score, confidence)
+                    name, confidence, list_type = face_db.predict(processed)
+                    draw_result(frame, detection.bbox, name, detection.score, confidence)
 
-                if name == CONFIG.get("unknown_label", "Intruder"):
-                    has_unknown = True
+                    if name == CONFIG.get("unknown_label", "Intruder"):
+                        has_unknown = True
+                    else:
+                        known_faces_this_frame.add(name)
+                        known_faces_types[name] = list_type
+
+                if has_unknown:
+                    speech.alert_intruder()
+                
+                for name in known_faces_this_frame:
+                    if name not in last_known_faces:
+                        speech.process_person(name, known_faces_types[name])
+
+                last_known_faces = known_faces_this_frame
+
+                has_blacklist = any(known_faces_types.get(name) == "blacklist" for name in known_faces_this_frame)
+                
+                if alarm_mode or has_blacklist:
+                    vol_mgr.crank()
                 else:
-                    known_faces_this_frame.add(name)
-                    known_faces_types[name] = list_type
+                    vol_mgr.restore()
 
-            if has_unknown:
-                speech.alert_intruder()
-            
-            for name in known_faces_this_frame:
-                if name not in last_known_faces:
-                    speech.process_person(name, known_faces_types[name])
+                if alarm_mode:
+                    if has_unknown or len(cached_detections) > 0:
+                        speech.speak("Alert Alert")
+                    else:
+                        alarm_mode = False
 
-            last_known_faces = known_faces_this_frame
-
-            has_blacklist = any(known_faces_types.get(name) == "blacklist" for name in known_faces_this_frame)
-            
-            if alarm_mode or has_blacklist:
-                vol_mgr.crank()
+                display_frame = cv2.resize(frame, (screen_w, screen_h), interpolation=cv2.INTER_LINEAR)
             else:
-                vol_mgr.restore()
+                # TAMPER MODE LOGIC
+                vol_mgr.crank()
+                if time.time() - last_tamper_alarm > 3.0:
+                    speech.speak("System tampered. Provide lock password.")
+                    last_tamper_alarm = time.time()
+                
+                display_frame = np.zeros((screen_h, screen_w, 3), dtype=np.uint8)
+                display_frame[:] = (0, 0, 255) # Red background
+                cv2.putText(display_frame, "SYSTEM TAMPERED", (50, screen_h//2 - 50), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
+                cv2.putText(display_frame, "PROVIDE PASSWORD TO UNLOCK", (50, screen_h//2 + 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
 
-            if alarm_mode:
-                if has_unknown or len(cached_detections) > 0:
-                    speech.speak("Alert Alert")
-                else:
-                    alarm_mode = False
-
-            display_frame = cv2.resize(frame, (screen_w, screen_h), interpolation=cv2.INTER_LINEAR)
             cv2.imshow("Coral Face Gate", display_frame)
             
             key = cv2.waitKey(1) & 0xFF
