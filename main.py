@@ -49,7 +49,8 @@ def log_event(message: str) -> None:
 
 class VolumeManager:
     def __init__(self):
-        self.saved_volume = 50
+        self.saved_volume = CONFIG.get("base_volume", 50)
+        self.alarm_volume = CONFIG.get("tamper_volume", 100)
         self.is_cranked = False
         self._get_initial_volume()
 
@@ -57,15 +58,15 @@ class VolumeManager:
         try:
             out = subprocess.check_output("amixer sget Master", shell=True, stderr=subprocess.DEVNULL).decode()
             if "[off]" in out:
-                self.saved_volume = 50
-                self.set_volume(50)
+                self.saved_volume = CONFIG.get("base_volume", 50)
+                self.set_volume(self.saved_volume)
             else:
                 match = re.search(r"\[(\d+)%\]", out)
                 if match:
                     vol = int(match.group(1))
                     if vol <= 5:  # Consider muted or practically 0
-                        self.saved_volume = 50
-                        self.set_volume(50)
+                        self.saved_volume = CONFIG.get("base_volume", 50)
+                        self.set_volume(self.saved_volume)
                     else:
                         self.saved_volume = vol
                 else:
@@ -81,7 +82,7 @@ class VolumeManager:
 
     def crank(self):
         if not self.is_cranked:
-            self.set_volume(100)
+            self.set_volume(self.alarm_volume)
             self.is_cranked = True
 
     def restore(self):
@@ -102,7 +103,9 @@ class SpeechEngine:
             with self.lock:
                 try:
                     speed = str(CONFIG.get("speech_speed", 150))
-                    subprocess.run(["espeak", "-s", speed, text], check=False)
+                    pitch = str(CONFIG.get("speech_pitch", 50))
+                    voice = CONFIG.get("voice_variant", "m1")
+                    subprocess.run(["espeak", "-s", speed, "-p", pitch, "-v", f"en+{voice}", text], check=False)
                 except Exception as e:
                     print(f"Audio Error: {e}")
 
@@ -110,6 +113,7 @@ class SpeechEngine:
         thread.start()
 
     def alert_intruder(self) -> None:
+        if not CONFIG.get("enable_intruder_alerts", True): return
         now = time.time()
         if now - self.last_intruder_alert_time >= self.intruder_cooldown:
             self.last_intruder_alert_time = now
@@ -121,11 +125,11 @@ class SpeechEngine:
         if now - last_time >= self.welcome_cooldown:
             self.last_welcome_time[name] = now
             
-            if list_type == "whitelist":
+            if list_type == "whitelist" and CONFIG.get("enable_whitelist_greetings", True):
                 self.speak(CONFIG["whitelist_greeting"].replace("{name}", name))
-            elif list_type == "blacklist":
+            elif list_type == "blacklist" and CONFIG.get("enable_blacklist_warnings", True):
                 self.speak(CONFIG["blacklist_greeting"].replace("{name}", name))
-            else:
+            elif list_type not in ["whitelist", "blacklist"] and CONFIG.get("enable_whitelist_greetings", True):
                 self.speak(CONFIG["default_known_greeting"].replace("{name}", name))
 
 @dataclass
@@ -238,12 +242,17 @@ class FaceDatabase:
         return CONFIG.get("unknown_label", "Intruder"), float(confidence), "unknown"
 
 def draw_result(frame: np.ndarray, bbox: Tuple[int, int, int, int], name: str, score: float, conf: float) -> None:
+    if not CONFIG.get("draw_boxes", True) and not CONFIG.get("draw_names", True): return
     x1, y1, x2, y2 = bbox
     known = name != CONFIG.get("unknown_label", "Intruder")
     color = (0, 200, 0) if known else (0, 0, 255)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-    cv2.rectangle(frame, (x1, max(0, y1 - 24)), (x2, y1), color, -1)
-    cv2.putText(frame, f"{name}", (x1 + 4, max(12, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    if CONFIG.get("draw_boxes", True):
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        
+    if CONFIG.get("draw_names", True):
+        cv2.rectangle(frame, (x1, max(0, y1 - 24)), (x2, y1), color, -1)
+        cv2.putText(frame, f"{name}", (x1 + 4, max(12, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -290,8 +299,10 @@ def main() -> int:
         log_event(f"CRITICAL: Camera initialization failed! {e}")
         tamper_mode = True
 
-    cv2.namedWindow("Coral Face Gate", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-    cv2.setWindowProperty("Coral Face Gate", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    window_title = CONFIG.get("window_title", "Coral Face Gate")
+    cv2.namedWindow(window_title, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+    if CONFIG.get("kiosk_fullscreen", True):
+        cv2.setWindowProperty(window_title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     screen_w, screen_h = get_display_resolution()
     print(f"[Init] Forcing custom fullscreen rendering at {screen_w}x{screen_h}")
@@ -379,7 +390,7 @@ def main() -> int:
                 cv2.putText(display_frame, "SYSTEM TAMPERED", (50, screen_h//2 - 50), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
                 cv2.putText(display_frame, "PROVIDE PASSWORD TO UNLOCK", (50, screen_h//2 + 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
 
-            cv2.imshow("Coral Face Gate", display_frame)
+            cv2.imshow(window_title, display_frame)
             
             key = cv2.waitKey(1) & 0xFF
             if key != 255:
