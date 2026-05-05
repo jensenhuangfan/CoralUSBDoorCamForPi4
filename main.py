@@ -241,29 +241,42 @@ def main() -> int:
     parser.add_argument("--usbcam", action="store_true")
     args, _ = parser.parse_known_args()
 
-    detector = CoralFaceDetector(
-        Path("models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"),
-        threshold=CONFIG.get("detection_threshold", 0.45)
-    )
-    face_db = FaceDatabase(unknown_threshold=CONFIG.get("unknown_threshold", 115.0))
+    tamper_mode = False
+    detector = None
+    face_db = None
     
-    train_dirs = [Path("whitelist")]
-    if CONFIG.get("has_blacklist"):
-        train_dirs.append(Path("blacklist"))
-    face_db.train(train_dirs, detector)
+    try:
+        detector = CoralFaceDetector(
+            Path("models/ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite"),
+            threshold=CONFIG.get("detection_threshold", 0.45)
+        )
+        face_db = FaceDatabase(unknown_threshold=CONFIG.get("unknown_threshold", 115.0))
+        
+        train_dirs = [Path("whitelist")]
+        if CONFIG.get("has_blacklist"):
+            train_dirs.append(Path("blacklist"))
+        face_db.train(train_dirs, detector)
+    except Exception as e:
+        print(f"[Security] hardware init failed (TPU missing?): {e}")
+        tamper_mode = True
     
     speech = SpeechEngine(
         intruder_cooldown=CONFIG.get("intruder_cooldown", 3.0),
         welcome_cooldown=CONFIG.get("welcome_cooldown", 8.0)
     )
 
+    cap = None
     use_usbcam = args.usbcam or (CONFIG.get("camera_type") == "usbcam")
-    if use_usbcam:
-        print(f"[Init] Connecting to USB Camera index {args.camera}...")
-        cap = cv2.VideoCapture(args.camera, cv2.CAP_V4L2)
-    else:
-        print("[Init] Connecting to Raspberry Pi Camera 3 via libcamera...")
-        cap = cv2.VideoCapture("libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink max-buffers=1 drop=true sync=false", cv2.CAP_GSTREAMER)
+    try:
+        if use_usbcam:
+            print(f"[Init] Connecting to USB Camera index {args.camera}...")
+            cap = cv2.VideoCapture(args.camera, cv2.CAP_V4L2)
+        else:
+            print("[Init] Connecting to Raspberry Pi Camera 3 via libcamera...")
+            cap = cv2.VideoCapture("libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink max-buffers=1 drop=true sync=false", cv2.CAP_GSTREAMER)
+    except Exception as e:
+        print(f"[Security] Camera Init Failed: {e}")
+        tamper_mode = True
 
     cv2.namedWindow("Coral Face Gate", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
     cv2.setWindowProperty("Coral Face Gate", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -273,7 +286,6 @@ def main() -> int:
 
     key_buffer = ""
     alarm_mode = False
-    tamper_mode = False
     last_tamper_alarm = 0.0
     vol_mgr = VolumeManager()
     
@@ -368,7 +380,8 @@ def main() -> int:
 
     finally:
         vol_mgr.restore()
-        cap.release()
+        if cap is not None:
+            cap.release()
         cv2.destroyAllWindows()
     return 0
 
