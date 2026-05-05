@@ -37,6 +37,16 @@ def get_display_resolution() -> Tuple[int, int]:
     except Exception:
         return 1920, 1080
 
+def log_event(message: str) -> None:
+    if not CONFIG.get("enable_logging", True): return
+    log_file = CONFIG.get("log_file", "security_log.txt")
+    try:
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_file, "a") as f:
+            f.write(f"[{now}] {message}\n")
+    except Exception as e:
+        print(f"Log Error: {e}")
+
 class VolumeManager:
     def __init__(self):
         self.saved_volume = 50
@@ -258,6 +268,7 @@ def main() -> int:
         face_db.train(train_dirs, detector)
     except Exception as e:
         print(f"[Security] hardware init failed (TPU missing?): {e}")
+        log_event("CRITICAL: Coral TPU hardware init failed!")
         tamper_mode = True
     
     speech = SpeechEngine(
@@ -276,6 +287,7 @@ def main() -> int:
             cap = cv2.VideoCapture("libcamerasrc ! video/x-raw, width=1280, height=720, framerate=30/1 ! videoconvert ! appsink max-buffers=1 drop=true sync=false", cv2.CAP_GSTREAMER)
     except Exception as e:
         print(f"[Security] Camera Init Failed: {e}")
+        log_event(f"CRITICAL: Camera initialization failed! {e}")
         tamper_mode = True
 
     cv2.namedWindow("Coral Face Gate", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
@@ -299,6 +311,7 @@ def main() -> int:
             if not tamper_mode:
                 ok, frame = cap.read()
                 if not ok: 
+                    log_event("TAMPER DETECTED: Camera unplugged or frame read failed!")
                     print("[Security] Camera unplugged or frame read failed! Entering TAMPER MODE.")
                     tamper_mode = True
                     continue
@@ -308,6 +321,7 @@ def main() -> int:
                     if frame_idx % 2 == 0:
                         cached_detections = detector.detect_faces(frame)
                 except Exception as e:
+                    log_event("TAMPER DETECTED: Hardware Exception (Coral TPU unplugged?)")
                     print(f"[Security] HW Exception (Coral TPU unplugged?): {e}")
                     tamper_mode = True
                     continue
@@ -334,6 +348,7 @@ def main() -> int:
                 
                 for name in known_faces_this_frame:
                     if name not in last_known_faces:
+                        log_event(f"Face recognized: {name} (Type: {known_faces_types[name]})")
                         speech.process_person(name, known_faces_types[name])
 
                 last_known_faces = known_faces_this_frame
@@ -370,10 +385,13 @@ def main() -> int:
             if key != 255:
                 if key in [10, 13]: 
                     if hashlib.sha256(key_buffer.encode()).hexdigest() == CONFIG.get("password_hash"):
+                        log_event("SUCCESS: Correct password entered to unlock system.")
                         if tamper_mode:
+                            log_event("Tamper mode recovering...")
                             exit_code = 42
                         break
                     else:
+                        log_event(f"SECURITY: Failed password attempt logged. Length={len(key_buffer)}")
                         alarm_mode = True
                         key_buffer = ""
                 elif key == 8 and len(key_buffer) > 0:
@@ -389,4 +407,4 @@ def main() -> int:
     return exit_code
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

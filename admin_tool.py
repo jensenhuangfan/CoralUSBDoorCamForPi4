@@ -48,9 +48,10 @@ def main():
         print("7. Check for App Updates (GitHub Sync)")
         print("8. Re-run Initial Setup Wizard")
         print("9. Uninstall Application")
-        print("10. Exit Admin Tool")
+        print("10. Configure Event Logging")
+        print("11. Exit Admin Tool")
         
-        choice = input("Select an option (1-10): ").strip()
+        choice = input("Select an option (1-11): ").strip()
         
         if choice == "1":
             print("\n[Change Camera Type]")
@@ -190,6 +191,31 @@ def main():
                 print("Uninstall cancelled.")
 
         elif choice == "10":
+            print("\n[Configure Event Logging]")
+            log_enabled = config.get("enable_logging", True)
+            print(f"1. Toggle Logging (Currently: {'ON' if log_enabled else 'OFF'})")
+            print(f"2. Change Log Target File (Currently: {config.get('log_file', 'security_log.txt')})")
+            print("3. View Recent Logs")
+            
+            sub = input("Select an option (1-3): ").strip()
+            if sub == "1":
+                config["enable_logging"] = not log_enabled
+                save_config(config)
+            elif sub == "2":
+                new_file = input("Enter new file path (e.g. security_log.txt): ").strip()
+                if new_file: 
+                    config["log_file"] = new_file
+                    save_config(config)
+            elif sub == "3":
+                lf = config.get("log_file", "security_log.txt")
+                if Path(lf).exists():
+                    print("\n--- RECENT LOGS ---")
+                    os.system(f"tail -n 20 {lf}")
+                    print("-------------------\n")
+                else:
+                    print("Log file not found.")
+        
+        elif choice == "11":
             print("Exiting tool.")
             break
         else:
