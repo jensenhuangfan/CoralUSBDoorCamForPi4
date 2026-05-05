@@ -1,6 +1,7 @@
 #!/bin/bash
 # Auto Update
 echo "[Run] Checking for GitHub updates..."
+git stash || true
 git pull origin main || echo "Update check failed or not a repo. Continuing..."
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
@@ -24,6 +25,9 @@ echo "[Lockdown] Shutting down Raspberry Pi desktop panels so nothing else can r
 pkill -f lxpanel || true
 pkill -f pcmanfm || true
 pkill -f wf-panel-pi || true
+
+echo "[Cleanup] Freeing up Coral TPU from zombie processes..."
+pkill -f "python3 main.py" || true
 
 echo "[Run] Starting Face Gate UI..."
 python3 main.py "$@"
