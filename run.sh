@@ -53,5 +53,8 @@ done
 
 echo "[Unlocked] Restoring desktop interface..."
 nohup lxpanel --profile LXDE-pi >/dev/null 2>&1 &
+disown
 nohup pcmanfm --desktop --profile LXDE-pi >/dev/null 2>&1 &
+disown
 nohup wf-panel-pi >/dev/null 2>&1 &
+disown
